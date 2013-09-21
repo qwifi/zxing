@@ -16,11 +16,16 @@
 
 package com.google.zxing.client.android.wifi;
 
+import android.annotation.TargetApi;
 import android.net.wifi.WifiConfiguration;
+import android.net.wifi.WifiEnterpriseConfig;
 import android.net.wifi.WifiManager;
 import android.os.AsyncTask;
+import android.os.Build;
 import android.util.Log;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -87,6 +92,8 @@ public final class WifiConfigManager extends AsyncTask<WifiParsedResult,Object,O
           changeNetworkWEP(wifiManager, theWifiResult);
         } else if (networkType == NetworkType.WPA) {
           changeNetworkWPA(wifiManager, theWifiResult);
+        } else if (networkType == NetworkType.WPAEAP) {
+          changeNetworkWPAEAP(wifiManager, theWifiResult);
         }
       }
     }
@@ -162,7 +169,230 @@ public final class WifiConfigManager extends AsyncTask<WifiParsedResult,Object,O
     updateNetwork(wifiManager, config);
   }
 
-  // Adding an open, unsecured network
+  private static void changeNetworkWPAEAP(WifiManager wifiManager, WifiParsedResult wifiResult) {
+    WifiConfiguration config = changeNetworkCommon(wifiResult);
+    // Hex passwords that are 64 bits long are not to be quoted.
+    config.preSharedKey = quoteNonHex(wifiResult.getPassword(), 64);
+    config.allowedAuthAlgorithms.set(WifiConfiguration.AuthAlgorithm.OPEN);
+    config.allowedProtocols.set(WifiConfiguration.Protocol.WPA); // For WPA
+    config.allowedProtocols.set(WifiConfiguration.Protocol.RSN); // For WPA2
+    config.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.IEEE8021X);
+    config.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.WPA_EAP);
+    config.allowedPairwiseCiphers.set(WifiConfiguration.PairwiseCipher.TKIP);
+    config.allowedPairwiseCiphers.set(WifiConfiguration.PairwiseCipher.CCMP);
+    config.allowedGroupCiphers.set(WifiConfiguration.GroupCipher.TKIP);
+    config.allowedGroupCiphers.set(WifiConfiguration.GroupCipher.CCMP);
+    setEapConfiguration(config, wifiResult);
+    updateNetwork(wifiManager, config);
+  }
+
+  private static void setEapConfiguration(WifiConfiguration config, WifiParsedResult wifiResult) {
+    if (android.os.Build.VERSION.SDK_INT >=18) {
+      setEapConfigurationCurrent(config, wifiResult);
+    }
+    else {
+      setEapConfigurationLegacy(config, wifiResult);
+    }
+  }
+
+  @TargetApi(18)
+  private static void setEapConfigurationCurrent(WifiConfiguration config, WifiParsedResult wifiResult) {
+    if("PEAP".equals(wifiResult.getEapType())) {
+      config.enterpriseConfig.setEapMethod(WifiEnterpriseConfig.Eap.PEAP);
+    }
+    else if("PWD".equals(wifiResult.getEapType())) {
+      config.enterpriseConfig.setEapMethod(WifiEnterpriseConfig.Eap.TTLS);
+    }
+    else if("TLS".equals(wifiResult.getEapType())) {
+      config.enterpriseConfig.setEapMethod(WifiEnterpriseConfig.Eap.TLS);
+    }
+    else if("TTLS".equals(wifiResult.getEapType())) {
+      config.enterpriseConfig.setEapMethod(WifiEnterpriseConfig.Eap.TTLS);
+    }
+    else {
+      config.enterpriseConfig.setEapMethod(WifiEnterpriseConfig.Eap.NONE);
+    }
+
+    if("GTC".equals(wifiResult.getEapType())) {
+      config.enterpriseConfig.setPhase2Method(WifiEnterpriseConfig.Phase2.GTC);
+    }
+    else if("MSCHAP".equals(wifiResult.getEapType())) {
+      config.enterpriseConfig.setPhase2Method(WifiEnterpriseConfig.Phase2.MSCHAP);
+    }
+    else if("MSCHAPV2".equals(wifiResult.getEapType())) {
+      config.enterpriseConfig.setPhase2Method(WifiEnterpriseConfig.Phase2.MSCHAPV2);
+    }
+    else if("PAP".equals(wifiResult.getEapType())) {
+      config.enterpriseConfig.setPhase2Method(WifiEnterpriseConfig.Phase2.PAP);
+    }
+    else {
+      config.enterpriseConfig.setPhase2Method(WifiEnterpriseConfig.Phase2.NONE);
+    }
+  }
+
+  /**
+   * Legacy enterprise wireless configuration, for use on devices with API level < 18
+   * @param selectedConfig
+   * @param wifiResult
+   */
+  private static void setEapConfigurationLegacy(WifiConfiguration selectedConfig, WifiParsedResult wifiResult) {
+    //ref: http://stackoverflow.com/a/4375874/577298
+    final String INT_PRIVATE_KEY = "private_key";
+    final String INT_PHASE2 = "phase2";
+    final String INT_PASSWORD = "password";
+    final String INT_IDENTITY = "identity";
+    final String INT_EAP = "eap";
+    final String INT_CLIENT_CERT = "client_cert";
+    final String INT_CA_CERT = "ca_cert";
+    final String INT_ANONYMOUS_IDENTITY = "anonymous_identity";
+    final String INT_ENTERPRISEFIELD_NAME = "android.net.wifi.WifiConfiguration$EnterpriseField";
+    // Reflection magic here too, need access to non-public APIs
+    try {
+      // Let the magic start
+      Class[] wcClasses = WifiConfiguration.class.getClasses();
+      // null for overzealous java compiler
+      Class wcEnterpriseField = null;
+
+      for (Class wcClass : wcClasses)
+        if (wcClass.getName().equals(INT_ENTERPRISEFIELD_NAME))
+        {
+            wcEnterpriseField = wcClass;
+            break;
+        }
+      boolean noEnterpriseFieldType = false;
+      if(wcEnterpriseField == null)
+        noEnterpriseFieldType = true; // Cupcake/Donut access enterprise settings directly
+
+      Field wcefAnonymousId = null, wcefCaCert = null, wcefClientCert = null, wcefEap = null, wcefIdentity = null, wcefPassword = null, wcefPhase2 = null, wcefPrivateKey = null;
+      Field[] wcefFields = WifiConfiguration.class.getFields();
+      // Dispatching Field vars
+      for (Field wcefField : wcefFields)
+      {
+        if (wcefField.getName().equals(INT_ANONYMOUS_IDENTITY))
+          wcefAnonymousId = wcefField;
+        else if (wcefField.getName().equals(INT_CA_CERT))
+          wcefCaCert = wcefField;
+        else if (wcefField.getName().equals(INT_CLIENT_CERT))
+          wcefClientCert = wcefField;
+        else if (wcefField.getName().equals(INT_EAP))
+          wcefEap = wcefField;
+        else if (wcefField.getName().equals(INT_IDENTITY))
+          wcefIdentity = wcefField;
+        else if (wcefField.getName().equals(INT_PASSWORD))
+          wcefPassword = wcefField;
+        else if (wcefField.getName().equals(INT_PHASE2))
+          wcefPhase2 = wcefField;
+        else if (wcefField.getName().equals(INT_PRIVATE_KEY))
+          wcefPrivateKey = wcefField;
+      }
+
+      Method wcefSetValue = null;
+      if(!noEnterpriseFieldType){
+       for(Method m: wcEnterpriseField.getMethods())
+          //System.out.println(m.getName());
+          if(m.getName().trim().equals("setValue"))
+              wcefSetValue = m;
+      }
+
+      /*EAP Method*/
+      if(!noEnterpriseFieldType)
+      {
+              wcefSetValue.invoke(wcefEap.get(selectedConfig), wifiResult.getEapType());
+      }
+      else
+      {
+              wcefEap.set(selectedConfig, wifiResult.getEapType());
+      }
+      /*EAP Phase 2 Authentication*/
+      if(!noEnterpriseFieldType)
+      {
+              wcefSetValue.invoke(wcefPhase2.get(selectedConfig), wifiResult.getPhase2Type());
+      }
+      else
+      {
+            wcefPhase2.set(selectedConfig, wifiResult.getPhase2Type());
+      }
+      /*EAP Anonymous Identity*/
+      /*if(!noEnterpriseFieldType)
+      {
+              wcefSetValue.invoke(wcefAnonymousId.get(selectedConfig), ENTERPRISE_ANON_IDENT);
+      }
+      else
+      {
+            wcefAnonymousId.set(selectedConfig, ENTERPRISE_ANON_IDENT);
+      }*/
+      //TODO: re-enable this
+      /*EAP CA Certificate*/
+      /*if(!noEnterpriseFieldType)
+      {
+              wcefSetValue.invoke(wcefCaCert.get(selectedConfig), ENTERPRISE_CA_CERT);
+      }
+      else
+      {
+            wcefCaCert.set(selectedConfig, ENTERPRISE_CA_CERT);
+      }*/
+      /*EAP Private key*/
+      /*if(!noEnterpriseFieldType)
+      {
+              wcefSetValue.invoke(wcefPrivateKey.get(selectedConfig), ENTERPRISE_PRIV_KEY);
+      }
+      else
+      {
+            wcefPrivateKey.set(selectedConfig, ENTERPRISE_PRIV_KEY);
+      }*/
+      /*EAP Identity*/
+      if(!noEnterpriseFieldType)
+      {
+              wcefSetValue.invoke(wcefIdentity.get(selectedConfig), wifiResult.getIdentity());
+      }
+      else
+      {
+            wcefIdentity.set(selectedConfig, wifiResult.getIdentity());
+      }
+      /*EAP Password*/
+      if(!noEnterpriseFieldType)
+      {
+              wcefSetValue.invoke(wcefPassword.get(selectedConfig), wifiResult.getPassword());
+      }
+      else
+      {
+            wcefPassword.set(selectedConfig, wifiResult.getPassword());
+      }
+      /*EAP Client certificate*/
+      /*if(!noEnterpriseFieldType)
+      {
+          wcefSetValue.invoke(wcefClientCert.get(selectedConfig), ENTERPRISE_CLIENT_CERT);
+      }
+      else
+      {
+            wcefClientCert.set(selectedConfig, ENTERPRISE_CLIENT_CERT);
+      }*/
+      /*// Adhoc for CM6
+      // if non-CM6 fails gracefully thanks to nested try-catch
+
+      try{
+      Field wcAdhoc = WifiConfiguration.class.getField("adhocSSID");
+      Field wcAdhocFreq = WifiConfiguration.class.getField("frequency");
+      //wcAdhoc.setBoolean(selectedConfig, prefs.getBoolean(PREF_ADHOC,
+      //      false));
+      wcAdhoc.setBoolean(selectedConfig, false);
+      int freq = 2462;    // default to channel 11
+      //int freq = Integer.parseInt(prefs.getString(PREF_ADHOC_FREQUENCY,
+      //"2462"));     // default to channel 11
+      //System.err.println(freq);
+      wcAdhocFreq.setInt(selectedConfig, freq); 
+      } catch (Exception e)
+      {
+          e.printStackTrace();
+      }*/
+
+    } catch (Exception e)
+    {
+      e.printStackTrace();
+    }
+  }
+
+// Adding an open, unsecured network
   private static void changeNetworkUnEncrypted(WifiManager wifiManager, WifiParsedResult wifiResult) {
     WifiConfiguration config = changeNetworkCommon(wifiResult);
     config.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.NONE);

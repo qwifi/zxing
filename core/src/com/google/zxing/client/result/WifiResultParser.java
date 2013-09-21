@@ -21,9 +21,11 @@ import com.google.zxing.Result;
 /**
  * <p>Parses a WIFI configuration string. Strings will be of the form:</p>
  *
- * <p>{@code WIFI:T:[network type];S:[network SSID];P:[network password];H:[hidden?];;}</p>
+ * <p>{@code WIFI:T:[network type];S:[network SSID];P:[network password];H:[hidden?];U:[identity];E:[EAPType];N:[Phase2AuthType];;}</p>
  *
- * <p>The fields can appear in any order. Only "S:" is required.</p>
+ * <p>The fields can appear in any order. For simple networks, only "S:" is required.</p>
+ *
+ * <p>For WAP-EAP (802.1x) networks, U, P, E, and N fields are required.</p>
  *
  * @author Vikram Aggarwal
  * @author Sean Owen
@@ -46,6 +48,26 @@ public final class WifiResultParser extends ResultParser {
       type = "nopass";
     }
     boolean hidden = Boolean.parseBoolean(matchSinglePrefixedField("H:", rawText, ';', false));
+
+    String identity = matchSinglePrefixedField("U:", rawText, ';', false);
+
+    if (identity != null && !identity.isEmpty())
+    {
+      if (pass == null || pass.isEmpty())
+        return null;
+
+      String eapType = matchSinglePrefixedField("E:", rawText, ';', false);
+      String phase2Type = matchSinglePrefixedField("N:", rawText, ';', false);
+
+      if(eapType == null || eapType.isEmpty())
+        return null;
+
+      if (phase2Type == null || phase2Type.isEmpty())
+        return null;
+
+      return new WifiParsedResult(type, ssid, pass, hidden, identity, eapType, phase2Type);
+    }
+
     return new WifiParsedResult(type, ssid, pass, hidden);
   }
 }

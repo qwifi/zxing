@@ -25,17 +25,28 @@ public final class WifiParsedResult extends ParsedResult {
   private final String networkEncryption;
   private final String password;
   private final boolean hidden;
+  private final String identity;
+  private final String eapType;
+  private final String phase2Type;
 
   public WifiParsedResult(String networkEncryption, String ssid, String password) {
     this(networkEncryption, ssid, password, false);
   }
 
   public WifiParsedResult(String networkEncryption, String ssid, String password, boolean hidden) {
+    this(networkEncryption, ssid, password, false, "", "", "");
+  }
+
+  public WifiParsedResult(String networkEncryption, String ssid, String password, boolean hidden,
+      String identity, String eapType, String phase2Type) {
     super(ParsedResultType.WIFI);
     this.ssid = ssid;
     this.networkEncryption = networkEncryption;
     this.password = password;
     this.hidden = hidden;
+    this.identity = identity;
+    this.eapType = eapType;
+    this.phase2Type = phase2Type;
   }
 
   public String getSsid() {
@@ -54,6 +65,18 @@ public final class WifiParsedResult extends ParsedResult {
     return hidden;
   }
 
+  public String getIdentity() {
+    return identity;
+  }
+
+  public String getEapType() {
+    return eapType;
+  }
+
+  public String getPhase2Type() {
+    return phase2Type;
+  }
+
   @Override
   public String getDisplayResult() {
     StringBuilder result = new StringBuilder(80);
@@ -63,5 +86,4 @@ public final class WifiParsedResult extends ParsedResult {
     maybeAppend(Boolean.toString(hidden), result);
     return result.toString();
   }
-
 }
