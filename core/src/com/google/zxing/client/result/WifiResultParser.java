@@ -52,7 +52,6 @@ public final class WifiResultParser extends ResultParser {
     String identity = matchSinglePrefixedField("U:", rawText, ';', false);
 
     String sessionTimeout = matchSinglePrefixedField("X:", rawText, ';', false);
-    
     if (sessionTimeout == null) sessionTimeout = "";
 
     if (identity != null && !identity.isEmpty())
@@ -68,7 +67,7 @@ public final class WifiResultParser extends ResultParser {
 
       if (phase2Type == null || phase2Type.isEmpty())
         return null;
-      
+
       return new WifiParsedResult(type, ssid, pass, hidden, identity, eapType, phase2Type, sessionTimeout);
     }
 
