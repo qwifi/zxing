@@ -90,6 +90,40 @@ public final class WifiResultHandler extends ResultHandler {
     ParsedResult.maybeAppend(wifiLabel + '\n' + wifiResult.getSsid(), contents);
     String typeLabel = parent.getString(R.string.wifi_type_label);
     ParsedResult.maybeAppend(typeLabel + '\n' + wifiResult.getNetworkEncryption(), contents);
+
+    String sessionLengthString = wifiResult.getSessionLength();
+    if(sessionLengthString != null && !sessionLengthString.isEmpty())
+    {
+      try
+      {
+        int sessionLength = Integer.parseInt(sessionLengthString);
+        String units = parent.getString(R.string.units_seconds_label);
+        //find best display units for session length
+        if (sessionLength / 86400 > 0)
+        {
+          sessionLength /= 86400;
+          units = parent.getString(R.string.units_days_label);
+        }
+        else if (sessionLength / 3600 > 0)
+        {
+          sessionLength /= 3600;
+          units = parent.getString(R.string.units_hours_label);
+        }
+        else if (sessionLength / 60 > 0)
+        {
+          sessionLength /= 60;
+          units = parent.getString(R.string.units_minutes_label);
+        }
+
+          String sessionLengthLabel = parent.getString(R.string.wifi_session_length_label);
+          ParsedResult.maybeAppend(sessionLengthLabel + '\n' + Integer.toString(sessionLength) + " " + units, contents);
+      }
+      catch(NumberFormatException exception)
+      {
+        //swallow exception
+      }
+    }
+
     return contents.toString();
   }
 
