@@ -16,18 +16,28 @@
 
 package com.google.zxing.client.android.wifi;
 
-import android.annotation.TargetApi;
-import android.net.wifi.WifiConfiguration;
-import android.net.wifi.WifiEnterpriseConfig;
-import android.net.wifi.WifiManager;
-import android.os.AsyncTask;
-import android.os.Build;
-import android.util.Log;
-
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.List;
+import java.util.TimeZone;
 import java.util.regex.Pattern;
+
+import android.annotation.TargetApi;
+import android.content.BroadcastReceiver;
+import android.content.ContentValues;
+import android.content.Context;
+import android.content.Intent;
+import android.database.sqlite.SQLiteDatabase;
+import android.net.wifi.SupplicantState;
+import android.net.wifi.WifiConfiguration;
+import android.net.wifi.WifiEnterpriseConfig;
+import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
+import android.os.AsyncTask;
+import android.util.Log;
 
 import com.google.zxing.client.result.WifiParsedResult;
 
@@ -169,6 +179,60 @@ public final class WifiConfigManager extends AsyncTask<WifiParsedResult,Object,O
     updateNetwork(wifiManager, config);
   }
 
+  private static int length;
+  private static String ssid = "";
+  public static final String dateTimeFormatString = "yyyy-MM-dd HH:mm:ss";
+  public static final BroadcastReceiver WifiBroadcastReceiver =
+    new BroadcastReceiver() {
+      @Override
+      public void onReceive(Context context, Intent intent) {
+        Log.v(TAG, "Receiver received wifi connection state broadcast notification.");
+
+        synchronized (this) { //enormous sync context here, but it's the best we can do for now.
+          if (ssid.equals(""))
+            return; //not currently listening for events
+          else {
+            Log.v(TAG, "Processing broadcast notification...");
+
+            WifiManager wifiManager = (WifiManager) context.getSystemService(Context.WIFI_SERVICE);
+            WifiInfo currentConnection = wifiManager.getConnectionInfo();
+
+            if(currentConnection.getSupplicantState() != SupplicantState.COMPLETED) {
+              Log.v(TAG, "Invalid connection state: " + currentConnection.getSupplicantState());
+              return;
+            }
+
+            if (!ssid.equals(currentConnection.getSSID())) {
+              Log.v(TAG, "Connection SSID " + currentConnection.getSSID() + " is not related to the connection we care about ("
+                    + ssid + ").");
+              return;
+            }
+
+            SQLiteDatabase db = new WifiSessionOpenHelper(context).getWritableDatabase();
+
+            ContentValues values = new ContentValues();
+            Log.v(TAG, "Current Network Id: " + currentConnection.getNetworkId());
+            values.put(WifiSessionOpenHelper.KEY_NETWORK_ID, currentConnection.getNetworkId());
+            //ref: http://stackoverflow.com/a/3914498/577298
+            TimeZone tz = TimeZone.getTimeZone("UTC");
+            DateFormat dateFormat = new SimpleDateFormat(dateTimeFormatString);
+            dateFormat.setTimeZone(tz);
+            String nowAsString = dateFormat.format(new Date());
+            Log.v(TAG, "Connection Start Time: " + nowAsString);
+            values.put(WifiSessionOpenHelper.KEY_START_TIME, nowAsString);
+            Log.v(TAG, "Connection Duration: " + length);
+            values.put(WifiSessionOpenHelper.KEY_LENGTH, length);
+
+            db.insert(WifiSessionOpenHelper.TABLE_NAME, null, values);
+            db.close();
+            Log.d(TAG, "Session information stored for network id " + currentConnection.getNetworkId());
+            ssid = "";
+            Log.v(TAG, "Finished broadcast receiver for " + currentConnection.getSSID() + ".");
+          }
+        }
+      }
+    };
+
   private static void changeNetworkWPAEAP(WifiManager wifiManager, WifiParsedResult wifiResult) {
     WifiConfiguration config = changeNetworkCommon(wifiResult);
     // Hex passwords that are 64 bits long are not to be quoted.
@@ -183,6 +247,14 @@ public final class WifiConfigManager extends AsyncTask<WifiParsedResult,Object,O
     config.allowedGroupCiphers.set(WifiConfiguration.GroupCipher.TKIP);
     config.allowedGroupCiphers.set(WifiConfiguration.GroupCipher.CCMP);
     setEapConfiguration(config, wifiResult);
+
+    if (wifiResult.getSessionLength() != null && !wifiResult.getSessionLength().isEmpty()) {
+      synchronized (WifiBroadcastReceiver) {
+        length = Integer.parseInt(wifiResult.getSessionLength());
+        ssid = wifiResult.getSsid();
+      }
+    }
+
     updateNetwork(wifiManager, config);
   }
 

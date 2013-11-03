@@ -172,6 +172,8 @@
         <category android:name="android.intent.category.DEFAULT"/>
       </intent-filter>
     </activity>
+    <!-- service to cull any wifi sessions that have become invalid -->
+    <service android:name=".wifi.SessionMonitor" />
   </application>
 
 </manifest>

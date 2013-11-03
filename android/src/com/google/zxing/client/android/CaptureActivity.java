@@ -16,30 +16,25 @@
 
 package com.google.zxing.client.android;
 
-import com.google.zxing.BarcodeFormat;
-import com.google.zxing.DecodeHintType;
-import com.google.zxing.Result;
-import com.google.zxing.ResultMetadataType;
-import com.google.zxing.ResultPoint;
-import com.google.zxing.client.android.camera.CameraManager;
-import com.google.zxing.client.android.history.HistoryActivity;
-import com.google.zxing.client.android.history.HistoryItem;
-import com.google.zxing.client.android.history.HistoryManager;
-import com.google.zxing.client.android.result.ResultButtonListener;
-import com.google.zxing.client.android.result.ResultHandler;
-import com.google.zxing.client.android.result.ResultHandlerFactory;
-import com.google.zxing.client.android.result.supplement.SupplementalInfoRetriever;
-import com.google.zxing.client.android.share.ShareActivity;
+import java.io.IOException;
+import java.text.DateFormat;
+import java.util.Collection;
+import java.util.Date;
+import java.util.EnumSet;
+import java.util.Map;
+import java.util.Set;
 
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.net.Uri;
+import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
@@ -61,13 +56,22 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import java.io.IOException;
-import java.text.DateFormat;
-import java.util.Collection;
-import java.util.Date;
-import java.util.EnumSet;
-import java.util.Map;
-import java.util.Set;
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.DecodeHintType;
+import com.google.zxing.Result;
+import com.google.zxing.ResultMetadataType;
+import com.google.zxing.ResultPoint;
+import com.google.zxing.client.android.camera.CameraManager;
+import com.google.zxing.client.android.history.HistoryActivity;
+import com.google.zxing.client.android.history.HistoryItem;
+import com.google.zxing.client.android.history.HistoryManager;
+import com.google.zxing.client.android.result.ResultButtonListener;
+import com.google.zxing.client.android.result.ResultHandler;
+import com.google.zxing.client.android.result.ResultHandlerFactory;
+import com.google.zxing.client.android.result.supplement.SupplementalInfoRetriever;
+import com.google.zxing.client.android.share.ShareActivity;
+import com.google.zxing.client.android.wifi.SessionMonitor;
+import com.google.zxing.client.android.wifi.WifiConfigManager;
 
 /**
  * This activity opens the camera and does the actual scanning on a background thread. It draws a
@@ -144,6 +148,13 @@ public final class CaptureActivity extends Activity implements SurfaceHolder.Cal
     ambientLightManager = new AmbientLightManager(this);
 
     PreferenceManager.setDefaultValues(this, R.xml.preferences, false);
+
+    Intent intent = new Intent(this, SessionMonitor.class);
+    startService(intent);
+
+    IntentFilter filter = new IntentFilter();
+    filter.addAction(WifiManager.NETWORK_STATE_CHANGED_ACTION);
+    registerReceiver(WifiConfigManager.WifiBroadcastReceiver, filter);
   }
 
   @Override
@@ -279,6 +290,7 @@ public final class CaptureActivity extends Activity implements SurfaceHolder.Cal
   @Override
   protected void onDestroy() {
     inactivityTimer.shutdown();
+    stopService(new Intent(this, SessionMonitor.class));
     super.onDestroy();
   }
 
