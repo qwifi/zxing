@@ -21,7 +21,7 @@ import com.google.zxing.Result;
 /**
  * <p>Parses a WIFI configuration string. Strings will be of the form:</p>
  *
- * <p>{@code WIFI:T:[network type];S:[network SSID];P:[network password];H:[hidden?];U:[identity];E:[EAPType];N:[Phase2AuthType]X:[SessionLengthInSeconds];;}</p>
+ * <p>{@code WIFI:T:[network type];S:[network SSID];P:[network password];H:[hidden?];U:[identity];E:[EAPType];N:[Phase2AuthType]X:[SessionLengthInSecondsOrUTCEndTime];;}</p>
  *
  * <p>The fields can appear in any order. For simple networks, only "S:" is required.</p>
  *

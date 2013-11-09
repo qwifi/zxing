@@ -16,6 +16,11 @@
 
 package com.google.zxing.client.android.result;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.TimeZone;
+
 import android.app.Activity;
 import android.content.Context;
 import android.net.wifi.WifiManager;
@@ -94,33 +99,41 @@ public final class WifiResultHandler extends ResultHandler {
     String sessionLengthString = wifiResult.getSessionLength();
     if(sessionLengthString != null && !sessionLengthString.isEmpty())
     {
-      try
+      if (sessionLengthString.matches("[0-9]+"))
       {
-        int sessionLength = Integer.parseInt(sessionLengthString);
-        String units = parent.getString(R.string.units_seconds_label);
-        //find best display units for session length
-        if (sessionLength / 86400 > 0)
+        try
         {
-          sessionLength /= 86400;
-          units = parent.getString(R.string.units_days_label);
-        }
-        else if (sessionLength / 3600 > 0)
-        {
-          sessionLength /= 3600;
-          units = parent.getString(R.string.units_hours_label);
-        }
-        else if (sessionLength / 60 > 0)
-        {
-          sessionLength /= 60;
-          units = parent.getString(R.string.units_minutes_label);
-        }
+          int sessionLength = Integer.parseInt(sessionLengthString);
+          String units = parent.getString(R.string.units_seconds_label);
+          //find best display units for session length
+          if (sessionLength / 86400 > 0)
+          {
+            sessionLength /= 86400;
+            units = parent.getString(R.string.units_days_label);
+          }
+          else if (sessionLength / 3600 > 0)
+          {
+            sessionLength /= 3600;
+            units = parent.getString(R.string.units_hours_label);
+          }
+          else if (sessionLength / 60 > 0)
+          {
+            sessionLength /= 60;
+            units = parent.getString(R.string.units_minutes_label);
+          }
 
           String sessionLengthLabel = parent.getString(R.string.wifi_session_length_label);
           ParsedResult.maybeAppend(sessionLengthLabel + '\n' + Integer.toString(sessionLength) + " " + units, contents);
+        }
+        catch(NumberFormatException exception)
+        {
+          //swallow exception
+        }
       }
-      catch(NumberFormatException exception)
+      else if (sessionLengthString.matches("[0-9]{4}-[0-1][0-9]-[0-9]{2} ((0|1)[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]"))
       {
-        //swallow exception
+        String sessionTimeoutLabel = parent.getString(R.string.wifi_session_timeout_label);
+        ParsedResult.maybeAppend(sessionTimeoutLabel + '\n' + sessionLengthString + " UTC", contents);
       }
     }
 

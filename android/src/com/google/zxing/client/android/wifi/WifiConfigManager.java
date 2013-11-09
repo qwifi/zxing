@@ -19,6 +19,7 @@ package com.google.zxing.client.android.wifi;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.text.DateFormat;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
@@ -181,6 +182,7 @@ public final class WifiConfigManager extends AsyncTask<WifiParsedResult,Object,O
 
   private static int length;
   private static String ssid = "";
+  private static Date timeout = null;
   public static final String dateTimeFormatString = "yyyy-MM-dd HH:mm:ss";
   public static final BroadcastReceiver WifiBroadcastReceiver =
     new BroadcastReceiver() {
@@ -217,10 +219,18 @@ public final class WifiConfigManager extends AsyncTask<WifiParsedResult,Object,O
             TimeZone tz = TimeZone.getTimeZone("UTC");
             DateFormat dateFormat = new SimpleDateFormat(dateTimeFormatString);
             dateFormat.setTimeZone(tz);
-            String nowAsString = dateFormat.format(new Date());
+            Date now = new Date();
+            String nowAsString = dateFormat.format(now);
             Log.v(TAG, "Connection Start Time: " + nowAsString);
             values.put(WifiSessionOpenHelper.KEY_START_TIME, nowAsString);
             Log.v(TAG, "Connection Duration: " + length);
+
+            if (timeout != null) {
+              length  = (int)Math.round((timeout.getTime()- now.getTime()) / 1000); //to nearest second
+              if (length < 0)
+                length = 0;
+              timeout = null;
+            }
             values.put(WifiSessionOpenHelper.KEY_LENGTH, length);
 
             db.insert(WifiSessionOpenHelper.TABLE_NAME, null, values);
@@ -248,10 +258,24 @@ public final class WifiConfigManager extends AsyncTask<WifiParsedResult,Object,O
     config.allowedGroupCiphers.set(WifiConfiguration.GroupCipher.CCMP);
     setEapConfiguration(config, wifiResult);
 
-    if (wifiResult.getSessionLength() != null && !wifiResult.getSessionLength().isEmpty()) {
+    String sessionLengthString = wifiResult.getSessionLength();
+    if (sessionLengthString != null && !sessionLengthString.isEmpty()) {
       synchronized (WifiBroadcastReceiver) {
-        length = Integer.parseInt(wifiResult.getSessionLength());
         ssid = wifiResult.getSsid();
+        if (sessionLengthString.matches("[0-9]{4}-[0-1][0-9]-[0-9]{2} ((0|1)[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]")) {
+          try {
+            String formatString = "yyyy-MM-dd HH:mm:ss";
+            SimpleDateFormat dateParser = new SimpleDateFormat(formatString);
+            dateParser.setTimeZone(TimeZone.getTimeZone("UTC")); //timeouts should be in UTC
+            timeout = dateParser.parse(sessionLengthString);
+          }
+          catch (ParseException e) {
+           //swallow exception
+          }
+        }
+        else {
+          length = Integer.parseInt(sessionLengthString);
+        }
       }
     }
 
