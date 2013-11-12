@@ -204,7 +204,7 @@ public final class WifiConfigManager extends AsyncTask<WifiParsedResult,Object,O
               return;
             }
 
-            if (!ssid.equals(currentConnection.getSSID())) {
+            if (!ssid.equals(currentConnection.getSSID()) && !("\"" + ssid + "\"").equals(currentConnection.getSSID())) {
               Log.v(TAG, "Connection SSID " + currentConnection.getSSID() + " is not related to the connection we care about ("
                     + ssid + ").");
               return;
@@ -324,6 +324,9 @@ public final class WifiConfigManager extends AsyncTask<WifiParsedResult,Object,O
     else {
       config.enterpriseConfig.setPhase2Method(WifiEnterpriseConfig.Phase2.NONE);
     }
+
+    config.enterpriseConfig.setIdentity(wifiResult.getIdentity());
+    config.enterpriseConfig.setPassword(wifiResult.getPassword());
   }
 
   /**
