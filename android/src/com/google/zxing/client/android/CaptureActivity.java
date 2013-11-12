@@ -291,6 +291,7 @@ public final class CaptureActivity extends Activity implements SurfaceHolder.Cal
   protected void onDestroy() {
     inactivityTimer.shutdown();
     stopService(new Intent(this, SessionMonitor.class));
+    unregisterReceiver(WifiConfigManager.WifiBroadcastReceiver);
     super.onDestroy();
   }
 
