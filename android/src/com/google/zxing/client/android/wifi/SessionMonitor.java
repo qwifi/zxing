@@ -1,5 +1,7 @@
 package com.google.zxing.client.android.wifi;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import android.app.Service;
@@ -17,6 +19,9 @@ import android.widget.Toast;
 public class SessionMonitor extends Service {
 
 	public static final String TAG = SessionMonitor.class.getSimpleName();
+
+	private List<Integer> notifiedOfExpiration = new ArrayList<Integer>();
+	private int aboutToExpireTime = 20; //in seconds
 
 	private WifiManager wifiManager;
 
@@ -51,14 +56,42 @@ public class SessionMonitor extends Service {
 
 			WifiInfo currentConnection = wifiManager.getConnectionInfo();
 
-			// check for expired connections
+			// check for connections that will soon expire
 			String query = "strftime('%s','now') - strftime('%s', "
-					+ WifiSessionOpenHelper.KEY_START_TIME + ") > "
-					+ WifiSessionOpenHelper.KEY_LENGTH;
+					+ WifiSessionOpenHelper.KEY_START_TIME + ") > ("
+					+ WifiSessionOpenHelper.KEY_LENGTH + " - "
+					+ Integer.toString(aboutToExpireTime) + ")";
 
 			Cursor queryResult = db.query(true,
 					WifiSessionOpenHelper.TABLE_NAME, columns, query, null,
 					null, null, null, null);
+
+			if (queryResult.getCount() > 0) {
+				Log.v(TAG, "Found connection(s) that are about to expire.");
+
+				queryResult.moveToFirst();
+				while (!queryResult.isAfterLast()) {
+					int networkId = queryResult.getInt(0);
+					Log.v(TAG, "Network id: " + Integer.toString(networkId));
+
+					if (networkId == currentConnection.getNetworkId()
+							&& !notifiedOfExpiration.contains(networkId)) {
+						toast("Connection to " + currentConnection.getSSID()
+								+ " about to expire.", Toast.LENGTH_SHORT);
+						notifiedOfExpiration.add(networkId);
+					}
+
+					queryResult.moveToNext();
+				}
+			}
+
+			// check for expired connections
+			query = "strftime('%s','now') - strftime('%s', "
+					+ WifiSessionOpenHelper.KEY_START_TIME + ") > "
+					+ WifiSessionOpenHelper.KEY_LENGTH;
+
+			queryResult = db.query(true, WifiSessionOpenHelper.TABLE_NAME,
+					columns, query, null, null, null, null, null);
 
 			if (queryResult.getCount() > 0) {
 				Log.v(TAG, "Found connection(s) with timeout.");
@@ -87,6 +120,9 @@ public class SessionMonitor extends Service {
 					db.delete(WifiSessionOpenHelper.TABLE_NAME,
 							WifiSessionOpenHelper.KEY_NETWORK_ID + "="
 									+ networkId, null);
+
+					notifiedOfExpiration.remove(notifiedOfExpiration
+							.indexOf(networkId));
 
 					wifiManager.removeNetwork(networkId);
 					Log.d(TAG, "Connection forgotten.");
