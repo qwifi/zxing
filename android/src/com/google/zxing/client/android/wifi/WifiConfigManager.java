@@ -39,6 +39,7 @@ import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.os.AsyncTask;
 import android.util.Log;
+import android.widget.Toast;
 
 import com.google.zxing.client.result.WifiParsedResult;
 
@@ -236,7 +237,10 @@ public final class WifiConfigManager extends AsyncTask<WifiParsedResult,Object,O
             db.insert(WifiSessionOpenHelper.TABLE_NAME, null, values);
             db.close();
             Log.d(TAG, "Session information stored for network id " + currentConnection.getNetworkId());
+
+            Toast.makeText(context, "Connection to \"" + ssid + "\" established.", Toast.LENGTH_SHORT).show();
             ssid = "";
+
             Log.v(TAG, "Finished broadcast receiver for " + currentConnection.getSSID() + ".");
           }
         }
