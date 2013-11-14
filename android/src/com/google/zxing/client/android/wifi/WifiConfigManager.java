@@ -200,14 +200,13 @@ public final class WifiConfigManager extends AsyncTask<WifiParsedResult,Object,O
             WifiManager wifiManager = (WifiManager) context.getSystemService(Context.WIFI_SERVICE);
             WifiInfo currentConnection = wifiManager.getConnectionInfo();
 
-            if(currentConnection.getSupplicantState() != SupplicantState.COMPLETED) {
-              Log.v(TAG, "Invalid connection state: " + currentConnection.getSupplicantState());
+            if (!ssid.equals(currentConnection.getSSID()) && !("\"" + ssid + "\"").equals(currentConnection.getSSID())) {
+              Log.v(TAG, "Connection SSID " + currentConnection.getSSID() + " is not related to the connection we care about (" + ssid + ").");
               return;
             }
 
-            if (!ssid.equals(currentConnection.getSSID()) && !("\"" + ssid + "\"").equals(currentConnection.getSSID())) {
-              Log.v(TAG, "Connection SSID " + currentConnection.getSSID() + " is not related to the connection we care about ("
-                    + ssid + ").");
+            if(currentConnection.getSupplicantState() != SupplicantState.COMPLETED) {
+              Log.v(TAG, "Invalid connection state: " + currentConnection.getSupplicantState());
               return;
             }
 
