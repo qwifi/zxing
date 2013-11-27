@@ -16,6 +16,7 @@
 
 package com.google.zxing.client.android.result;
 
+import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -97,27 +98,21 @@ public final class WifiResultHandler extends ResultHandler {
     ParsedResult.maybeAppend(typeLabel + '\n' + wifiResult.getNetworkEncryption(), contents);
 
     String sessionLengthString = wifiResult.getSessionLength();
-    if(sessionLengthString != null && !sessionLengthString.isEmpty())
-    {
-      if (sessionLengthString.matches("[0-9]+"))
-      {
-        try
-        {
+    if(sessionLengthString != null && !sessionLengthString.isEmpty()) {
+      if (sessionLengthString.matches("[0-9]+")) {
+        try {
           int sessionLength = Integer.parseInt(sessionLengthString);
           String units = parent.getString(R.string.units_seconds_label);
           //find best display units for session length
-          if (sessionLength / 86400 > 0)
-          {
+          if (sessionLength / 86400 > 0) {
             sessionLength /= 86400;
             units = parent.getString(R.string.units_days_label);
           }
-          else if (sessionLength / 3600 > 0)
-          {
+          else if (sessionLength / 3600 > 0) {
             sessionLength /= 3600;
             units = parent.getString(R.string.units_hours_label);
           }
-          else if (sessionLength / 60 > 0)
-          {
+          else if (sessionLength / 60 > 0) {
             sessionLength /= 60;
             units = parent.getString(R.string.units_minutes_label);
           }
@@ -125,16 +120,36 @@ public final class WifiResultHandler extends ResultHandler {
           String sessionLengthLabel = parent.getString(R.string.wifi_session_length_label);
           ParsedResult.maybeAppend(sessionLengthLabel + '\n' + Integer.toString(sessionLength) + " " + units, contents);
         }
-        catch(NumberFormatException exception)
-        {
+        catch(NumberFormatException exception) {
           //swallow exception
         }
       }
-      else if (sessionLengthString.matches("[0-9]{4}-[0-1][0-9]-[0-9]{2} ((0|1)[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]"))
-      {
-        String sessionTimeoutLabel = parent.getString(R.string.wifi_session_timeout_label);
-        ParsedResult.maybeAppend(sessionTimeoutLabel + '\n' + sessionLengthString + " UTC", contents);
+      else if (sessionLengthString.matches("[0-9]{4}-[0-1][0-9]-[0-9]{2} ((0|1)[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]")) {
+        try {
+          TimeZone utcTimeZone = TimeZone.getTimeZone("UTC");
+          DateFormat utcDateFormat = new SimpleDateFormat(WifiConfigManager.DateTimeFormatString);
+          utcDateFormat.setTimeZone(utcTimeZone);
+          Date utcDate = utcDateFormat.parse(sessionLengthString);
+
+          TimeZone localTimeZone = TimeZone.getDefault();
+          DateFormat localDateFormat = new SimpleDateFormat("yyyy-MM-dd h:mm:ss a z");
+          localDateFormat.setTimeZone(localTimeZone);
+
+          String result = localDateFormat.format(utcDate);
+
+          String sessionTimeoutLabel = parent.getString(R.string.wifi_session_timeout_label);
+          ParsedResult.maybeAppend(sessionTimeoutLabel + '\n' + result, contents);
+        } catch (ParseException e) {
+          ParsedResult.maybeAppend("Unrecognized Time Format", contents);
+        }
       }
+
+      String identity = wifiResult.getIdentity();
+      ParsedResult.maybeAppend(identity, contents);
+      String password = wifiResult.getPassword();
+      ParsedResult.maybeAppend(password, contents);
+
+      Log.v(TAG, "Access code: '" + identity + "' '" + password + "'");
     }
 
     return contents.toString();

@@ -184,7 +184,7 @@ public final class WifiConfigManager extends AsyncTask<WifiParsedResult,Object,O
   private static int length;
   private static String ssid = "";
   private static Date timeout = null;
-  public static final String dateTimeFormatString = "yyyy-MM-dd HH:mm:ss";
+  public static final String DateTimeFormatString = "yyyy-MM-dd HH:mm:ss";
   public static final BroadcastReceiver WifiBroadcastReceiver =
     new BroadcastReceiver() {
       @Override
@@ -220,7 +220,7 @@ public final class WifiConfigManager extends AsyncTask<WifiParsedResult,Object,O
             values.put(WifiSessionOpenHelper.KEY_NETWORK_ID, currentConnection.getNetworkId());
             //ref: http://stackoverflow.com/a/3914498/577298
             TimeZone tz = TimeZone.getTimeZone("UTC");
-            DateFormat dateFormat = new SimpleDateFormat(dateTimeFormatString);
+            DateFormat dateFormat = new SimpleDateFormat(DateTimeFormatString);
             dateFormat.setTimeZone(tz);
             Date now = new Date();
             String nowAsString = dateFormat.format(now);
