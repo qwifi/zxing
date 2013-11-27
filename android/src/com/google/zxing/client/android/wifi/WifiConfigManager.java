@@ -212,6 +212,9 @@ public final class WifiConfigManager extends AsyncTask<WifiParsedResult,Object,O
 
             SQLiteDatabase db = new WifiSessionOpenHelper(context).getWritableDatabase();
 
+            //remove any existing timeouts for this connection id
+            db.delete(WifiSessionOpenHelper.TABLE_NAME, WifiSessionOpenHelper.KEY_NETWORK_ID + "=" + currentConnection.getNetworkId(), null);
+
             ContentValues values = new ContentValues();
             Log.v(TAG, "Current Network Id: " + currentConnection.getNetworkId());
             values.put(WifiSessionOpenHelper.KEY_NETWORK_ID, currentConnection.getNetworkId());
