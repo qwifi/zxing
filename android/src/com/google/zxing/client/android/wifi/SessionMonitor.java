@@ -153,10 +153,14 @@ public class SessionMonitor extends Service {
 	public int onStartCommand(Intent intent, int flags, int startId) {
 		Log.d(TAG, "Starting session monitor...");
 		isActive.set(true);
-		monitorThread.start();
-
-		Log.d(TAG, "Session monitor started.");
-		return START_STICKY;
+		try {
+			monitorThread.start();
+			Log.d(TAG, "Session monitor started.");
+			return START_STICKY;
+		} catch (RuntimeException e) {
+			Log.e(TAG, e.getMessage());
+			return START_NOT_STICKY; //don't try to restart if there's a problem launching our background thread
+		}
 	}
 
 	@Override
