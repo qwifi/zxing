@@ -20,8 +20,8 @@ public class SessionMonitor extends Service {
 
 	public static final String TAG = SessionMonitor.class.getSimpleName();
 
-	private List<Integer> notifiedOfExpiration = new ArrayList<Integer>();
-	private int aboutToExpireTime = 20; //in seconds
+	private List<Integer> expiringSoon = new ArrayList<Integer>();
+	private int aboutToExpireTime = 20; // in seconds
 
 	private WifiManager wifiManager;
 
@@ -74,11 +74,13 @@ public class SessionMonitor extends Service {
 					int networkId = queryResult.getInt(0);
 					Log.v(TAG, "Network id: " + Integer.toString(networkId));
 
-					if (networkId == currentConnection.getNetworkId()
-							&& !notifiedOfExpiration.contains(networkId)) {
-						toast("Connection to " + currentConnection.getSSID()
-								+ " about to expire.", Toast.LENGTH_SHORT);
-						notifiedOfExpiration.add(networkId);
+					if (!expiringSoon.contains(networkId)) {
+						if (networkId == currentConnection.getNetworkId()) {
+							toast("Connection to " + currentConnection.getSSID()
+									+ " about to expire.", Toast.LENGTH_SHORT);
+						}
+
+						expiringSoon.add(networkId);
 					}
 
 					queryResult.moveToNext();
@@ -121,8 +123,10 @@ public class SessionMonitor extends Service {
 							WifiSessionOpenHelper.KEY_NETWORK_ID + "="
 									+ networkId, null);
 
-					notifiedOfExpiration.remove(notifiedOfExpiration
-							.indexOf(networkId));
+					int i = expiringSoon.indexOf(networkId);
+					if (i != -1) {
+						expiringSoon.remove(i);
+					}
 
 					wifiManager.removeNetwork(networkId);
 					Log.d(TAG, "Connection forgotten.");
